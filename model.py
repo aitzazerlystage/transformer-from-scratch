@@ -11,7 +11,8 @@ class InputEmbeddings(nn.Module):
         self.embedding = nn.Embedding(vocab_size, d_model)
 
     def forward(self, x):
-        return self.embedding(x) * math.sqrt(self.d_model)
+        x = self.embedding(x) * math.sqrt(self.d_model)
+        return x
 
 # Positional Encoding Layer#
 class PositionalEncoding(nn.Module):
@@ -40,9 +41,10 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
         #Forward pass
-        def forward(self, x):
-            x = x + (self.pe[:, :x.shape[1], :]).requires_grad_(False)
-            return self.dropout(x)
+    def forward(self, x):
+        x = x + (self.pe[:, :x.shape[1], :]).requires_grad_(False)
+        x = self.dropout(x)
+        return x
 
 
 class LayerNormalization(nn.Module):
@@ -57,7 +59,9 @@ class LayerNormalization(nn.Module):
         mean = x.mean(dim = -1, keepdim = True)
         std = x.std(dim = -1, keepdim = True)
 
-        return self.alpha * (x - mean) / (std + self.eps) + self.bias
+        x = self.alpha * (x - mean) / (std + self.eps) + self.bias
+
+        return x
 
 
 class FeedForwardBlock(nn.Module):
@@ -74,7 +78,8 @@ class FeedForwardBlock(nn.Module):
         )
 
     def forward(self, x):
-        return self.network(x)
+        x = self.network(x)
+        return x
 
 
 
@@ -105,15 +110,17 @@ class MultiHeadAttentionBlock(nn.Module):
     def attention(query, key, value, mask, dropout : nn.Dropout):
         d_k = query.shape[-1]
 
-        # (batch_size, h, seq_len, d_k) --> (batch_size, seq_len, seq_len)
+        # (batch_size, h, seq_len, d_k) --> (batch_size, h, seq_len, seq_len)
         attention_scores = (query @ key.transpose(-2, -1)) / math.sqrt(d_k)
         if mask is not None:
             attention_scores.masked_fill_(mask == 0, -1e9)
-        attention_scores = attention_scores.softmax(dim = -1) # (batch_size, seq_len, seq_len)
+        attention_scores = attention_scores.softmax(dim = -1) # (batch_size, h, seq_len, seq_len)
         if dropout is not None:
             attention_scores = dropout(attention_scores)
 
-        return (attention_scores @ value), attention_scores        
+        output = attention_scores @ value
+
+        return output, attention_scores        
 
     def forward(self, q, k, v, mask = None):
         query = self.w_q(q) # (batch_size, seq_len, d_model) --> (batch_size, seq_len, d_model)
@@ -132,7 +139,25 @@ class MultiHeadAttentionBlock(nn.Module):
         x = x.transpose(1, 2).contiguous().view(x.shape[0], -1, self.h * self.d_k)
        
         # (batch_size, seq_len, d_model) ---> (batch_size, seq_len, d_model)
-        return self.w_o(x)
+        x = self.w_o(x)
+        return x
+
+class ResidualConnection(nn.Module):
+
+    def __init__(self, dropout : float) -> None:
+        super().__init__()
+
+        self.dropout = nn.Dropout(dropout)
+        self.norm = LayerNormalization()
+
+    def forward(self, x, sublayer):
+        residual = x
+        x = self.norm(x)
+        x = sublayer(x)
+        x = self.dropout(x)
+        x = x + residual
+
+        return x
 
 
 
