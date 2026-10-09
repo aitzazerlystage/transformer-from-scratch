@@ -223,7 +223,20 @@ class Decoder(nn.Module):
             x = layer(x, encoder_output, src_mask, tgt_mask)
         return self.norm(x)
      
-        
+
+class ProjectionLayer(nn.Module):
+
+    def __init__(self, d_model: int, vocab_size: int) -> None:
+        super().__init__()
+        self.proj = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x):
+        x = self.proj(x)
+        x = torch.log_softmax(x, dim = -1)
+
+        return x
+
+
         
 
     
