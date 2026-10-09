@@ -213,7 +213,7 @@ class DecoderBlock(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, layers, nn.ModuleList) -> None:
+    def __init__(self, layers: nn.ModuleList) -> None:
         super().__init__()
         self.layers = layers
         self.norm = LayerNormalization()
@@ -263,7 +263,7 @@ class Transformer(nn.Module):
         return tgt
 
     def project(self, x):
-        
+
         x = self.projection_layer(x)
 
         return x
