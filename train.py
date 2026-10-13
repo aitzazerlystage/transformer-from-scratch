@@ -66,8 +66,8 @@ def get_ds(config):
         max_len_src = max(max_len_src, len(src_ids))
         max_len_tgt = max(max_len_tgt, len(tgt_ids))
 
-    print(f"Max Lenght of Source sentence: {max_len_src}")
-    print(f"Max Lenght of Target sentence: {max_len_tgt}")
+    print(f"Max Length of Source sentence: {max_len_src}")
+    print(f"Max Length of Target sentence: {max_len_tgt}")
 
     train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
     val_dataloader = DataLoader(val_ds, batch_size=1, shuffle=True)
@@ -84,7 +84,7 @@ def train_model(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device {device}')
 
-    Path(config['model_folder']).makdir(parents=True, exist_ok=True)
+    Path(config['model_folder']).mkdir(parents=True, exist_ok=True)
 
     train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(config)
     model = get_model(config, tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size()).to(device)
@@ -95,7 +95,7 @@ def train_model(config):
     optimizer = torch.optim.Adam(model.parameters(), lr= config['lr'], eps=1e-9)
 
     initial_epoch = 0
-    global_epoch = 0
+    global_step = 0
     
     # for Resuming training
     if config['preload']:
@@ -111,11 +111,11 @@ def train_model(config):
     #Training Loop
     for epoch in range(initial_epoch, config['num_epochs']):
         model.train()
-        batch_iterator = tqdm(train_dataloader, desc=f'Processing epoch {epoch:02e}')
+        batch_iterator = tqdm(train_dataloader, desc=f'Processing epoch {epoch:02d}')
 
         for batch in batch_iterator:
 
-            encoder_input = batch['encoder_inpit'].to(device)
+            encoder_input = batch['encoder_input'].to(device)
             decoder_input = batch['decoder_input'].to(device)
             encoder_mask = batch['encoder_mask'].to(device)
             decoder_mask = batch['decoder_mask'].to(device)
