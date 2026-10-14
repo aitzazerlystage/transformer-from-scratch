@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from dataset import BilingualDataset, casual_mask
+from dataset import BilingualDataset, casual_mask, causal_mask
 from model import build_transformer
 from config import get_weights_file_path, get_config
 
@@ -21,6 +21,42 @@ from tqdm import tqdm
 import warnings
 
 from pathlib import Path
+
+def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_len, device):
+    sos_idx = tokenizer_tgt.token_to_id('[SOS]')
+    eos_idx = tokenizer_tgt.token_to_id('[EOS]')
+
+    # Precompute the encoder output and reuse it for every token we get from the decoder
+    encoder_output = model.encode(source, source_mask)
+
+    #initialize the decoder input with sos token
+    decoder_input = torch.empty(1,1).fill_(sos_idx).type_as(source).to(device)
+
+    while True:
+        if decoder_input.size(1) == max_len:   # we have to stop if either EOS reaches or max_len is reached
+            break
+        
+        # Build mask for the target (decoder input)
+        decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).to(device)
+
+        # Calculate the output of the decoder
+        out = model.decode(encoder_output, source_mask, decoder_input, decoder_mask)
+
+        # Get the next predictions
+        prob = model.project(out[:, -1])
+
+        #select the token with heighest probability (because it is greedy search)
+        _, next_word = torch.max(prob, dim=-1)
+        
+        # Concat it to the decoder input as it will help in getting the next word after it
+        decoder_input = torch.cat([decoder_input, torch.empty(1, 1).type_as(source).fill_(next_word.item()).to(device)], dim=1)
+
+        if next_word == eos_idx:        # we have to stop if either EOS reaches or max_len is reached
+            break
+
+        return decoder_input.squeeze(0)
+
+
 
 def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, device, print_msg, global_state, writer, num_examples=2):
     model.eval()
@@ -40,6 +76,26 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
             encoder_mask = batch['encoder_mask'].to(device)
 
             assert encoder_input.size(0) == 1, "Batch size must be 1 for validation"
+
+            model_out = greedy_decode(model, encoder_input, encoder_mask, tokenizer_src, tokenizer_tgt, max_len, device)
+
+            source_text = batch['src_text'][0]
+            target_text = batch['tgt_text'][0]
+            model_out_text = tokenizer_tgt.decode(model_out.detach().cpu().numpy())    # We have to decode tokens into words
+
+            source_text.append(source_texts)
+            expected.append(target_text)
+            predicted.append(model_out_text)
+
+            # Print on the Console
+
+            print_msg('-'*console_width)
+            print_msg(f'SOURCE: {source_text}')
+            print_msg(f"TARGET: {target_text}")
+            print_msg(f'PREDICTED: {model_out_text}')
+
+            if count == num_examples
+            break
 
 
 
@@ -167,6 +223,8 @@ def train_model(config):
             optimizer.zero_grad()
 
             global_step += 1
+
+        run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step, writer)
 
         
         #save the model
