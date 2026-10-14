@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from dataset import BilingualDataset, casual_mask, causal_mask
+from dataset import BilingualDataset, causal_mask
 from model import build_transformer
 from config import get_weights_file_path, get_config
 
@@ -54,7 +54,7 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
         if next_word == eos_idx:        # we have to stop if either EOS reaches or max_len is reached
             break
 
-        return decoder_input.squeeze(0)
+    return decoder_input.squeeze(0)
 
 
 
@@ -83,7 +83,7 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
             target_text = batch['tgt_text'][0]
             model_out_text = tokenizer_tgt.decode(model_out.detach().cpu().numpy())    # We have to decode tokens into words
 
-            source_text.append(source_texts)
+            source_texts.append(source_text)
             expected.append(target_text)
             predicted.append(model_out_text)
 
@@ -94,8 +94,8 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
             print_msg(f"TARGET: {target_text}")
             print_msg(f'PREDICTED: {model_out_text}')
 
-            if count == num_examples
-            break
+            if count == num_examples:
+               break
 
 
 
