@@ -15,9 +15,9 @@ class BilingualDataset(Dataset):
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
 
-        self.sos_token = torch.Tensor([tokenizer_src.token_to_id(['[SOS]'])], dtype=torch.int64)
-        self.eos_token = torch.Tensor([tokenizer_src.token_to_id(['[EOS]'])], dtype=torch.int64)
-        self.pad_token = torch.Tensor([tokenizer_src.token_to_id(['[PAD]'])], dtype=torch.int64)
+        self.sos_token = torch.tensor([tokenizer_tgt.token_to_id('[SOS]')], dtype=torch.int64)
+        self.eos_token = torch.tensor([tokenizer_tgt.token_to_id('[EOS]')], dtype=torch.int64)
+        self.pad_token = torch.tensor([tokenizer_tgt.token_to_id('[PAD]')], dtype=torch.int64)
 
 
     def __len__(self):
@@ -74,7 +74,7 @@ class BilingualDataset(Dataset):
             "encoder_input" : encoder_input,
             "decoder_input" : decoder_input,
             "encoder_mask" : (encoder_input != self.pad_token).unsqueeze(0).unsqueeze(0).int(),  # Not to Compare Padding tokens in Self attention
-            "decoder_mask" : (decoder_input != self.pad_token).unsqueeze(0).unsqueeze(0) & causal_mask(decoder_input.size(0)), # Not to compare padding tokens AND the Tokens after the word position. Meaning, only to compare the Token/word with the words that come before it. not with the words that come after it.
+            "decoder_mask" : (decoder_input != self.pad_token).unsqueeze(0).int() & causal_mask(decoder_input.size(0)), # Not to compare padding tokens AND the Tokens after the word position. Meaning, only to compare the Token/word with the words that come before it. not with the words that come after it.
             "label" : label,
             "src_text" : src_text,
             "tgt_text" : tgt_text
