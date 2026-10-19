@@ -1,4 +1,3 @@
-from dill.detect import parents
 import tokenizers
 import torch
 import torch.nn as nn
@@ -108,7 +107,8 @@ def get_or_build_tokenizer(config, ds, lang):
     if not Path.exists(tokenizer_path):
         tokenizer = Tokenizer(WordLevel(unk_token='[UNK]'))
         tokenizer.pre_tokenizer = Whitespace()
-        trainer = WordLevelTrainer(get_all_sentences(ds, lang), trainer=trainer)
+        trainer = WordLevelTrainer(special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"], min_frequency=2)
+        tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer=trainer)
         tokenizer.save(str(tokenizer_path))
 
     else:
@@ -139,7 +139,7 @@ def get_ds(config):
 
     for item in ds_raw:
         src_ids = tokenizer_src.encode(item['translation'][config['lang_src']]).ids
-        tgt_ids = tokenizer_src.encode(item['translation'][config['lang_tgt']]).ids
+        tgt_ids = tokenizer_tgt.encode(item['translation'][config['lang_tgt']]).ids
         max_len_src = max(max_len_src, len(src_ids))
         max_len_tgt = max(max_len_tgt, len(tgt_ids))
 
@@ -152,7 +152,7 @@ def get_ds(config):
     return train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt
 
 def get_model(config, vocab_src_len, vocab_tgt_len):             #Source             #Target
-    model = build_transformer(vocab_src_len, vocab_tgt_len, config['seq_len'], config['seq_len'], config['d_model'])
+    model = build_transformer(vocab_src_len, vocab_tgt_len, config['seq_len'], config['seq_len'], config['d_model'], N=3) # training 3 layers
     return model
 
 
@@ -183,7 +183,7 @@ def train_model(config):
         optimizer.load_state_dict(state['optimizer_state_dict'])
         global_step = state['global_step']
     
-    loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_src.token_to_id('[PAD]'), label_smoothing=0.1).to(device)
+    loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_tgt.token_to_id('[PAD]'), label_smoothing=0.1).to(device)
 
     #Training Loop
     for epoch in range(initial_epoch, config['num_epochs']):
@@ -213,8 +213,7 @@ def train_model(config):
 
             # Log the Loss
             writer.add_scalar('trainer loss', loss.item(), global_step)
-            writer.flush()
-
+            
             #Backpropagate the loss
             loss.backward()
 
